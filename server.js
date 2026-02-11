@@ -20,7 +20,9 @@ const dbName = 'PassifyDB';
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+    origin: '*'  // allows all origins
+}))
 app.use(express.json());
 
 let db, collection;
