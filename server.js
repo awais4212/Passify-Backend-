@@ -1,63 +1,79 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient, ObjectId, ServerApiVersion } from 'mongodb';
 import cors from 'cors';
 
 dotenv.config();
 
-// MongoDB connection
 const url = process.env.MONGO_URI;
-const client = new MongoClient(url);
+
+// Add SSL/TLS options
+const client = new MongoClient(url, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
+});
 
 const dbName = 'PassifyDB';
 const app = express();
-const port = process.env.PORT || 3000; // ✅ FIXED: Use Railway's dynamic port
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
+let db, collection;
+
+async function connectDB() {
+    try {
+        await client.connect();
+        console.log('Connected to MongoDB');
+        db = client.db(dbName);
+        collection = db.collection('Passwords');
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        process.exit(1);
+    }
+}
+
 // Get all passwords
 app.get('/', async (req, res) => {
     try {
-        await client.connect();
-        const db = client.db(dbName);
-        const collection = db.collection('Passwords');
         const findResult = await collection.find({}).toArray();
-        res.send(findResult);
+        res.json(findResult);
     } catch (error) {
-        res.status(500).send({ success: false, error: error.message });
+        console.error('GET error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 })
 
 // Save password
 app.post('/', async (req, res) => {
     try {
-        await client.connect();
-        const db = client.db(dbName);
-        const collection = db.collection('Passwords');
         const insertResult = await collection.insertOne(req.body);
-        res.send({ success: true, result: insertResult });
+        res.json({ success: true, result: insertResult });
     } catch (error) {
-        res.status(500).send({ success: false, error: error.message });
+        console.error('POST error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 })
 
 // Delete password
 app.delete('/', async (req, res) => {
     try {
-        await client.connect();
-        const db = client.db(dbName);
-        const collection = db.collection('Passwords');
         const deleteResult = await collection.deleteOne({
             _id: new ObjectId(req.body.id)
         });
-        res.send({ success: true, result: deleteResult });
+        res.json({ success: true, result: deleteResult });
     } catch (error) {
-        res.status(500).send({ success: false, error: error.message });
+        console.error('DELETE error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 })
 
-// ✅ FIXED: Bind to 0.0.0.0 and use dynamic port
-app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on port ${port}`)
-})
+connectDB().then(() => {
+    app.listen(port, '0.0.0.0', () => {
+        console.log(`Server running on port ${port}`);
+    });
+});
